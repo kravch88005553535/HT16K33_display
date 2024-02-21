@@ -57,7 +57,7 @@ void I2C::GenerateStopCondition()
   mp_i2c->CR1 |= I2C_CR1_STOP;
 }
 
-void I2C::TransmitDeviceAddress(uint16_t a_address)
+void I2C::TransmitDeviceAddress(uint16_t a_address) //add r/2w bit & rewrite this function
 {
   switch (static_cast <uint32_t> (m_address))
   {

@@ -56,6 +56,8 @@ public:
   void SetBlink(const Blink a_blink);
   
 private:
+  HT16K33_Display() = delete;
+
   void TransmitData(const Position a_position, const uint8_t a_byte1, const uint8_t a_byte2);
   void TransmitData(const Position a_position, const uint16_t a_byte12);
   void TransmitCommand(const uint8_t a_command);

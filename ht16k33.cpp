@@ -1,6 +1,6 @@
 #include "ht16k33.h"
 
-// bit position for enabling segments:
+// bit position of segments:
 //
 //       ------1------
 //      | \    |    / |
@@ -24,9 +24,9 @@ HT16K33_Display::HT16K33_Display(Pin& a_sck_pin, Pin& a_dio_pin, I2C& aref_i2c, 
   , m_dio_pin{a_dio_pin}
   , mref_i2c{aref_i2c}
   , m_brightness{Brightness::Brightness_16}
-  , m_i2c_address{a_i2c_address}
+  , m_i2c_address{static_cast<uint8_t>(a_i2c_address << 1)}
 {
-  TransmitCommand(0x21);    //turn oscillator on
+  TransmitCommand(0x21);    //turn display's oscillator on
   TurnDisplayOn();
   SetBrightness(m_brightness);
   SetBlink(Blink_OFF);
@@ -77,14 +77,14 @@ void HT16K33_Display::DecrementBrightness()
 
 void HT16K33_Display::Clear()
 {
-  for (int i = 0; i < 4; ++i) 
+  for (volatile auto i{0}; i < 4; ++i) 
     TransmitData(static_cast<HT16K33_Display::Position>(i), 0);
 }  
 
 void HT16K33_Display::PrintNumber(uint32_t a_decimal_number, const Position a_separator_position)
 {
   uint16_t digit_array[4];
-  for (volatile auto i = 0; i < 4; ++i)
+  for (volatile auto i{0}; i < 4; ++i)
   {
     digit_array[3-i] = DigitToSymbol(a_decimal_number % 10);
     a_decimal_number /= 10;
@@ -95,7 +95,7 @@ void HT16K33_Display::PrintNumber(uint32_t a_decimal_number, const Position a_se
   if(a_separator_position != Position_NONE)
     digit_array[a_separator_position] |= separator_bitmask;
   
-  for(volatile auto i = 0; i < 4; ++i) 
+  for(volatile auto i{0}; i < 4; ++i) 
     TransmitData(static_cast<Position>(i), digit_array[i]);
 }
 
@@ -109,7 +109,7 @@ void HT16K33_Display::PrintFloatNumber(float a_number)
 
 void HT16K33_Display::PrintString(const char* a_string)
 {
-  for (volatile auto i = 0; i < 4; ++i)
+  for (volatile auto i{0}; i < 4; ++i)
     TransmitData(static_cast<Position>(i), CharacterToSymbol(*a_string++));
 }
 
