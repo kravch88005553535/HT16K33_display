@@ -19,10 +19,8 @@
 //                     ****
 
 
-HT16K33_Display::HT16K33_Display(Pin& a_sck_pin, Pin& a_dio_pin, I2C& aref_i2c, const uint8_t a_i2c_address)
-  : m_sck_pin{a_sck_pin}
-  , m_dio_pin{a_dio_pin}
-  , mref_i2c{aref_i2c}
+HT16K33_Display::HT16K33_Display(I2C& aref_i2c, const uint8_t a_i2c_address)
+  : mref_i2c{aref_i2c}
   , m_brightness{Brightness::Brightness_16}
   , m_i2c_address{static_cast<uint8_t>(a_i2c_address << 1)}
 {

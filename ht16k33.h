@@ -38,7 +38,7 @@ public:
   };
   
   
-  explicit HT16K33_Display(Pin& a_sck_pin, Pin& a_dio_pin, I2C& aref_i2c, const uint8_t a_i2c_address);
+  explicit HT16K33_Display(I2C& aref_i2c, const uint8_t a_i2c_address);
   ~HT16K33_Display();
   
   void TurnDisplayOn();
@@ -65,8 +65,6 @@ private:
   uint16_t DigitToSymbol(const uint8_t a_digit) const;
   uint16_t CharacterToSymbol(const uint8_t a_character) const;
 
-  Pin& m_sck_pin;
-  Pin& m_dio_pin;
   I2C& mref_i2c;
   Brightness m_brightness;
   Blink m_blink_frequency;
