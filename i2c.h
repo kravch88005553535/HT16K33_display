@@ -49,6 +49,8 @@ public:
   void Lock();
   void Unlock();
   bool IsLocked();
+  
+  bool IsBusBusy();
   void GenerateStartCondition();
   void GenerateStopCondition();
   void TransmitDeviceAddress(uint16_t a_address);

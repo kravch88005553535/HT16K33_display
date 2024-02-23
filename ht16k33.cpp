@@ -108,7 +108,18 @@ void HT16K33_Display::PrintFloatNumber(float a_number)
 void HT16K33_Display::PrintString(const char* a_string)
 {
   for (volatile auto i{0}; i < 4; ++i)
-    TransmitData(static_cast<Position>(i), CharacterToSymbol(*a_string++));
+  {
+    uint16_t data{0};    
+    data |= CharacterToSymbol(*a_string++);
+
+    if((*a_string) == '.' || (*a_string) == ',')
+    {
+      data |= 0x4000;
+      a_string++;
+    }
+    
+    TransmitData(static_cast<Position>(i), data);
+  }
 }
 
 void HT16K33_Display::SetBlink(const Blink a_blink)
@@ -328,6 +339,13 @@ uint16_t HT16K33_Display::CharacterToSymbol(const uint8_t a_character) const
     
     case'-':
     return 0xC0;
+    
+    case '/':
+    return 0x0C00;
+    
+    case '.':
+    case ',':
+    return 0x4000;
     
     case ' ':
     return 0;

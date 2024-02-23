@@ -16,8 +16,7 @@ I2C::I2C(I2C_TypeDef* ap_i2c, uint32_t a_i2c_clock, Speed a_speed, Address a_add
     break;
 #endif //#ifndef STM32F103C6T6
   }
-  
-  
+
   mp_i2c->CR1 |= I2C_CR1_SWRST;
   mp_i2c->CR1 &= ~I2C_CR1_SWRST;
   
@@ -45,6 +44,11 @@ bool I2C::IsLocked()
   return m_islocked;
 } 
 
+bool I2C::IsBusBusy()
+{
+  return mp_i2c->SR2 & I2C_SR2_BUSY;
+}
+
 void I2C::GenerateStartCondition()
 {
   mp_i2c->CR1 |= I2C_CR1_START;
@@ -55,6 +59,8 @@ void I2C::GenerateStartCondition()
 void I2C::GenerateStopCondition()
 {
   mp_i2c->CR1 |= I2C_CR1_STOP;
+  
+  while(IsBusBusy());
 }
 
 void I2C::TransmitDeviceAddress(uint16_t a_address) //add r/2w bit & rewrite this function
