@@ -133,22 +133,12 @@ void HT16K33_Display::PrintString(const char* a_string)
   m_string_buffer = a_string;
   m_string_ptr_offset = 0;
   m_string_length = strlen(a_string);
-  ClearDisplayBuffer();
   if(!m_string_length)
-    return;
-  //print operation
-  uint8_t commas_number{0};
-  for (volatile auto i{0}; i < m_digits; ++i)
   {
-    m_digits[i] = CharacterToSymbol(m_string_buffer[i+m_string_ptr_offset+commas_number])
-    
-    if(m_digits[i+1] == '.' or m_digits[i+1] == ',')
-    {
-      ++commas_number;
-      constexpr auto comma_bitmask{0x4000};
-      m_digits[i] |= comma_bitmask;
-    }
-  }
+    ClearDisplayBuffer();
+    return;
+  }  
+  FillDisplaybufferWithString();
   Update();
 }
 
@@ -159,32 +149,12 @@ void HT16K33_Display::UpdateString()
     m_string_ptr_offset = 0;
     return;
   }
-  else
-    ClearDisplayBuffer();
   
-  auto symbols_remaining{m_string_length - m_string_ptr_offset};
-  if(symbols_remaining < 0)
-    m_string_ptr_offset = 0;
+  auto shifts_remaining{m_string_length - m_string_ptr_offset-m_digits};
   
-  for (volatile auto i{0}; i < m_digits; ++i)
-  {
-    if(m_string_buffer[i+m_string_ptr_offset] == '\n')
-    {
-      m_display_buffer[i] = 0;
-      return;
-    }
-
-    m_display_buffer[i] |= CharacterToSymbol(m_string_buffer[i+m_string_ptr_offset]);
-
-    if((*a_string) == '.' or (*a_string) == ',')
-    {
-      data |= 0x4000;
-      a_string++;
-    }
-    m_display_buffer[i] = data;
-
-  }
-  
+  m_string_ptr_offset = (shifts_remaining <= 0) ? 0 : m_string_ptr_offset+1;
+  // (shifts_remaining <= 0) ? m_string_ptr_offset = 0 : ++m_string_ptr_offset;
+  FillDisplaybufferWithString();
 }
   
 void HT16K33_Display::SetBlink(const Blink a_blink)
@@ -193,22 +163,18 @@ void HT16K33_Display::SetBlink(const Blink a_blink)
   TransmitCommand(a_blink);
 }
 
-
-void HT16K33_Display::Execute()
+void HT16K33_Display::Update()
 {
   if(m_update_timer.Check())
   {
     if(m_status == Status_on_printing_string)
-    {
-      ++m_string_ptr_offset;
       UpdateString();
-    }
-    
-    Update();
-    //load new values to ds
+
+    for(volatile auto i{0}; i < m_digits; ++i)
+      TransmitData(static_cast<Position>(i), m_display_buffer[i]);
   }
 }
-  
+
 void HT16K33_Display::TransmitCommand(const uint8_t a_command)
 {
   mref_i2c.GenerateStartCondition();
@@ -438,8 +404,24 @@ void HT16K33_Display::ClearDisplayBuffer()
   for (volatile auto i{0}; i < m_digits; ++i)
     m_display_buffer[i] = 0;
 }
-void HT16K33_Display::Update()
+void HT16K33_Display::FillDisplaybufferWithString()
 {
-  for(volatile auto i{0}; i < m_digits; ++i)
-    TransmitData(static_cast<Position>(i), m_display_buffer[i]);
-} 
+  ClearDisplayBuffer();
+  uint8_t commas_number{0};
+  for (volatile auto i{0}; i < m_digits; ++i)
+  {
+    auto current_character_index{i+commas_number};
+    auto next_character_index{i+commas_number};
+    
+    m_display_buffer[i] = CharacterToSymbol(m_string_buffer[m_string_ptr_offset+current_character_index]);
+    constexpr auto comma_bitmask{0x4000};
+    
+    if((m_string_buffer[next_character_index] == '.' or m_string_buffer[next_character_index] == ',')
+       and m_display_buffer[i] != comma_bitmask)
+    {
+      ++commas_number;
+      m_display_buffer[i] |= comma_bitmask;
+    }
+  }
+}
+ 

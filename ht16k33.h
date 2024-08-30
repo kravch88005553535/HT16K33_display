@@ -63,8 +63,7 @@ public:
   void PrintString(const char* a_string);
   void UpdateString();
   void SetBlink(const Blink a_blink);
-  void Execute();
-  
+  void Update();
 private:
   enum Status : uint8_t
   {
@@ -77,7 +76,8 @@ private:
   void TransmitData(const Position a_position, const uint16_t a_byte12);
   void TransmitCommand(const uint8_t a_command);
   void ClearDisplayBuffer();
-  void Update();
+  void FillDisplaybufferWithString();
+
   uint16_t DigitToSymbol(const uint8_t a_digit) const;
   uint16_t CharacterToSymbol(const uint8_t a_character) const;
 
