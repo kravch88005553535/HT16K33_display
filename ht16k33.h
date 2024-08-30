@@ -4,10 +4,15 @@
 #include "stm32f10x.h"
 #include "gpio_stm32f103.h"
 #include "i2c.h"
-
+#include "program_timer.h"
 class HT16K33_Display
 {
 public:
+  enum Digits
+  {
+    Digits_4 = 4,
+    Digits_8 = 8
+  };
   enum Brightness: uint8_t
   {
     Brightness_1 = 0,  Brightness_2,
@@ -26,17 +31,20 @@ public:
     Position_1,
     Position_2,
     Position_3,
+    Position_4,
+    Position_5,
+    Position_6,
+    Position_7,
     Position_NONE
   };
 
   enum Blink: uint8_t
   {
-    Blink_OFF = 0x81,
+    Blink_Off = 0x81,
     Blink_2Hz = 0x83,
     Blink_1Hz = 0x85,
     Blink_0_5Hz = 0x87
   };
-  
   
   explicit HT16K33_Display(I2C& aref_i2c, const uint8_t a_i2c_address);
   ~HT16K33_Display();
@@ -49,26 +57,42 @@ public:
   void IncrementBrightness();
   void DecrementBrightness();
   void Clear();
-  
+
   void PrintNumber(uint32_t a_decimal_number, const Position a_separator_position = Position_NONE);
   void PrintFloatNumber(float a_number); 
   void PrintString(const char* a_string);
+  void UpdateString();
   void SetBlink(const Blink a_blink);
+  void Execute();
   
 private:
+  enum Status : uint8_t
+  {
+    Status_ok,
+    Status_on_printing_string
+  };
   HT16K33_Display() = delete;
 
   void TransmitData(const Position a_position, const uint8_t a_byte1, const uint8_t a_byte2);
   void TransmitData(const Position a_position, const uint16_t a_byte12);
   void TransmitCommand(const uint8_t a_command);
-
+  void ClearDisplayBuffer();
+  void Update();
   uint16_t DigitToSymbol(const uint8_t a_digit) const;
   uint16_t CharacterToSymbol(const uint8_t a_character) const;
 
-  I2C& mref_i2c;
-  Brightness m_brightness;
-  Blink m_blink_frequency;
-  const uint8_t m_i2c_address;
+  I2C&            mref_i2c;
+  Brightness      m_brightness;
+  Blink           m_blink_frequency;
+  const uint8_t   m_i2c_address;
+  Program_timer&  m_update_timer;
+
+  const Digits    m_digits;
+  const char*     m_string_buffer;
+  uint8_t         m_string_ptr_offset;
+  uint8_t         m_string_length;
+  uint16_t* const m_display_buffer;
+  Status          m_status;
 };
 
 #endif //__HT16K33__

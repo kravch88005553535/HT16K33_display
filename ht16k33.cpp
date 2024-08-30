@@ -1,4 +1,6 @@
+#include <cstring>
 #include "ht16k33.h"
+
 
 // bit position of segments:
 //
@@ -22,16 +24,28 @@
 HT16K33_Display::HT16K33_Display(I2C& aref_i2c, const uint8_t a_i2c_address)
   : mref_i2c{aref_i2c}
   , m_brightness{Brightness::Brightness_16}
+  , m_blink_frequency{Blink_Off}
   , m_i2c_address{static_cast<uint8_t>(a_i2c_address << 1)}
+  , m_update_timer{* new Program_timer(Program_timer::TimerType_loop)}
+  , m_digits{Digits_4}
+  , m_string_buffer{nullptr}
+  , m_string_ptr_offset{0}  
+  , m_string_length{0}
+  , m_display_buffer{new uint16_t[m_digits]}
+  , m_status{Status_ok}
 {
   TransmitCommand(0x21);    //turn display's oscillator on
   TurnDisplayOn();
   SetBrightness(m_brightness);
-  SetBlink(Blink_OFF);
+  SetBlink(Blink_Off);
+  Clear();
+  Update();
 }
 
 HT16K33_Display::~HT16K33_Display()
 {
+  delete[] m_display_buffer;
+  delete  &m_update_timer;
 }
 
 void HT16K33_Display::TurnDisplayOn()
@@ -75,59 +89,126 @@ void HT16K33_Display::DecrementBrightness()
 
 void HT16K33_Display::Clear()
 {
-  for (volatile auto i{0}; i < 4; ++i) 
-    TransmitData(static_cast<HT16K33_Display::Position>(i), 0);
+  ClearDisplayBuffer();
+  Update();
 }  
 
 void HT16K33_Display::PrintNumber(uint32_t a_decimal_number, const Position a_separator_position)
 {
-  uint16_t digit_array[4];
-  for (volatile auto i{0}; i < 4; ++i)
+  m_string_buffer = nullptr;
+  m_status = Status_ok;
+  ClearDisplayBuffer();
+  
+  for (volatile auto i{0}; i < m_digits; ++i)
   {
-    digit_array[3-i] = DigitToSymbol(a_decimal_number % 10);
+    const auto index{m_digits-1-i};
+    m_display_buffer[index] = DigitToSymbol(a_decimal_number % 10);
     a_decimal_number /= 10;
+    
+    if(!a_decimal_number)
+      break;
   }
-  
   constexpr auto separator_bitmask{0x4000};
-  
   if(a_separator_position != Position_NONE)
-    digit_array[a_separator_position] |= separator_bitmask;
+    m_display_buffer[a_separator_position] |= separator_bitmask;
   
-  for(volatile auto i{0}; i < 4; ++i) 
-    TransmitData(static_cast<Position>(i), digit_array[i]);
+  Update();
+  m_update_timer.Reload();
+  m_update_timer.Start();
 }
 
 void HT16K33_Display::PrintFloatNumber(float a_number)
 {
+  m_string_buffer = nullptr;
+  m_status = Status_ok;
+  
   if (a_number < 0 || a_number > 99.9)
     return;
-  
   else PrintNumber(a_number*100, Position_1);
 }
 
 void HT16K33_Display::PrintString(const char* a_string)
 {
-  for (volatile auto i{0}; i < 4; ++i)
+  m_status = Status_on_printing_string;
+  m_string_buffer = a_string;
+  m_string_ptr_offset = 0;
+  m_string_length = strlen(a_string);
+  ClearDisplayBuffer();
+  if(!m_string_length)
+    return;
+  //print operation
+  uint8_t commas_number{0};
+  for (volatile auto i{0}; i < m_digits; ++i)
   {
-    uint16_t data{0};    
-    data |= CharacterToSymbol(*a_string++);
+    m_digits[i] = CharacterToSymbol(m_string_buffer[i+m_string_ptr_offset+commas_number])
+    
+    if(m_digits[i+1] == '.' or m_digits[i+1] == ',')
+    {
+      ++commas_number;
+      constexpr auto comma_bitmask{0x4000};
+      m_digits[i] |= comma_bitmask;
+    }
+  }
+  Update();
+}
 
-    if((*a_string) == '.' || (*a_string) == ',')
+void HT16K33_Display::UpdateString()
+{
+  if(m_string_length <= m_digits)
+  {
+    m_string_ptr_offset = 0;
+    return;
+  }
+  else
+    ClearDisplayBuffer();
+  
+  auto symbols_remaining{m_string_length - m_string_ptr_offset};
+  if(symbols_remaining < 0)
+    m_string_ptr_offset = 0;
+  
+  for (volatile auto i{0}; i < m_digits; ++i)
+  {
+    if(m_string_buffer[i+m_string_ptr_offset] == '\n')
+    {
+      m_display_buffer[i] = 0;
+      return;
+    }
+
+    m_display_buffer[i] |= CharacterToSymbol(m_string_buffer[i+m_string_ptr_offset]);
+
+    if((*a_string) == '.' or (*a_string) == ',')
     {
       data |= 0x4000;
       a_string++;
     }
-    
-    TransmitData(static_cast<Position>(i), data);
-  }
-}
+    m_display_buffer[i] = data;
 
+  }
+  
+}
+  
 void HT16K33_Display::SetBlink(const Blink a_blink)
 {
   m_blink_frequency = a_blink;
   TransmitCommand(a_blink);
 }
 
+
+void HT16K33_Display::Execute()
+{
+  if(m_update_timer.Check())
+  {
+    if(m_status == Status_on_printing_string)
+    {
+      ++m_string_ptr_offset;
+      UpdateString();
+    }
+    
+    Update();
+    //load new values to ds
+  }
+}
+  
 void HT16K33_Display::TransmitCommand(const uint8_t a_command)
 {
   mref_i2c.GenerateStartCondition();
@@ -352,3 +433,13 @@ uint16_t HT16K33_Display::CharacterToSymbol(const uint8_t a_character) const
   }
   return 0;
 }
+void HT16K33_Display::ClearDisplayBuffer()
+{
+  for (volatile auto i{0}; i < m_digits; ++i)
+    m_display_buffer[i] = 0;
+}
+void HT16K33_Display::Update()
+{
+  for(volatile auto i{0}; i < m_digits; ++i)
+    TransmitData(static_cast<Position>(i), m_display_buffer[i]);
+} 
