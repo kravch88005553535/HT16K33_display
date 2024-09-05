@@ -21,7 +21,7 @@
 //                     ****
 
 
-HT16K33_Display::HT16K33_Display(I2C& aref_i2c, const uint8_t a_i2c_address)
+HT16K33_Display::HT16K33_Display(I2C& aref_i2c, const uint8_t a_i2c_address, const uint32_t a_shift_interval_ms)
   : mref_i2c{aref_i2c}
   , m_brightness{Brightness::Brightness_16}
   , m_blink_frequency{Blink_Off}
@@ -29,6 +29,7 @@ HT16K33_Display::HT16K33_Display(I2C& aref_i2c, const uint8_t a_i2c_address)
   , m_update_timer{* new Program_timer(Program_timer::TimerType_loop)}
   , m_digits{Digits_4}
   , m_string_buffer{nullptr}
+  , m_shift_delay{0}
   , m_string_ptr_offset{0}  
   , m_string_length{0}
   , m_display_buffer{new uint16_t[m_digits]}
@@ -40,6 +41,8 @@ HT16K33_Display::HT16K33_Display(I2C& aref_i2c, const uint8_t a_i2c_address)
   SetBlink(Blink_Off);
   Clear();
   Update();
+  m_update_timer.SetInterval_ms(a_shift_interval_ms);
+  m_update_timer.Start();
 }
 
 HT16K33_Display::~HT16K33_Display()
@@ -114,7 +117,7 @@ void HT16K33_Display::PrintNumber(uint32_t a_decimal_number, const Position a_se
   
   Update();
   m_update_timer.Reload();
-  m_update_timer.Start();
+  m_shift_delay = 0;
 }
 
 void HT16K33_Display::PrintFloatNumber(float a_number)
@@ -139,6 +142,8 @@ void HT16K33_Display::PrintString(const char* a_string)
     return;
   }  
   FillDisplaybufferWithString();
+  m_update_timer.Reload();
+  m_shift_delay = 0;
   Update();
 }
 
@@ -152,9 +157,14 @@ void HT16K33_Display::UpdateString()
   
   auto shifts_remaining{m_string_length - m_string_ptr_offset-m_digits};
   
+  if(m_string_ptr_offset == 0 or shifts_remaining == 0)
+  {
+    if(m_shift_delay++ % 3 != 0)
+      return;
+  }
   m_string_ptr_offset = (shifts_remaining <= 0) ? 0 : m_string_ptr_offset+1;
-  // (shifts_remaining <= 0) ? m_string_ptr_offset = 0 : ++m_string_ptr_offset;
   FillDisplaybufferWithString();
+  
 }
   
 void HT16K33_Display::SetBlink(const Blink a_blink)

@@ -2,3 +2,4 @@ check update function for data transmission
 check  void HT16K33_Display::PrintNumber(uint32_t a_decimal_number, const Position a_separator_position) for printing numbers less than 1000
 PrintFloatNumber - digits print in case of any m_digits
 add number of digits to ctor
+finish all problems with update timer

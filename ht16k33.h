@@ -46,7 +46,7 @@ public:
     Blink_0_5Hz = 0x87
   };
   
-  explicit HT16K33_Display(I2C& aref_i2c, const uint8_t a_i2c_address);
+  explicit HT16K33_Display(I2C& aref_i2c, const uint8_t a_i2c_address, const uint32_t a_shift_interval_ms);
   ~HT16K33_Display();
   
   void TurnDisplayOn();
@@ -61,7 +61,6 @@ public:
   void PrintNumber(uint32_t a_decimal_number, const Position a_separator_position = Position_NONE);
   void PrintFloatNumber(float a_number); 
   void PrintString(const char* a_string);
-  void UpdateString();
   void SetBlink(const Blink a_blink);
   void Update();
 private:
@@ -77,7 +76,8 @@ private:
   void TransmitCommand(const uint8_t a_command);
   void ClearDisplayBuffer();
   void FillDisplaybufferWithString();
-
+  void UpdateString();
+  
   uint16_t DigitToSymbol(const uint8_t a_digit) const;
   uint16_t CharacterToSymbol(const uint8_t a_character) const;
 
@@ -89,6 +89,7 @@ private:
 
   const Digits    m_digits;
   const char*     m_string_buffer;
+  uint32_t        m_shift_delay;
   uint8_t         m_string_ptr_offset;
   uint8_t         m_string_length;
   uint16_t* const m_display_buffer;

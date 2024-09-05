@@ -11,14 +11,12 @@ int main()
   Pin  i2c_sda_pin  (GPIOB, 7, Pin::mode_alternate_function_open_drain);  //SDA  //b9 remap
 
   I2C i2c (I2C1, rcc.GetPeripheralClock(I2C1), I2C::Speed_100kHz, I2C::Address_7bit);
-  HT16K33_Display display(i2c, 0x70);
+  HT16K33_Display display(i2c, 0x70, 250);
   display.Clear();
+  display.PrintString("temp string");
   while(1)
   {
-    for(volatile auto i{0}; i<10000; ++i)
-      display.PrintNumber(i);
-      
-    display.Clear();
+    display.Update();
   }
   return 0;
 }
