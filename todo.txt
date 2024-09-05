@@ -3,3 +3,5 @@ check  void HT16K33_Display::PrintNumber(uint32_t a_decimal_number, const Positi
 PrintFloatNumber - digits print in case of any m_digits
 add number of digits to ctor
 finish all problems with update timer
+add check at printstring for the buffer address equality (if string we want to print equals printing string)
+fix bug with commas at printstring

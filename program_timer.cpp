@@ -57,6 +57,10 @@ bool Program_timer::Check()
     if(overflows_number > (m_previous_overflow_number + m_interval_ms))
     {
       m_previous_overflow_number = overflows_number - overflows_number % m_interval_ms;
+      
+      if(m_timertype == TimerType_one_pulse) //this string needs optimization
+        Stop();
+      
       return true;
     }
   }

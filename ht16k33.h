@@ -46,7 +46,7 @@ public:
     Blink_0_5Hz = 0x87
   };
   
-  explicit HT16K33_Display(I2C& aref_i2c, const uint8_t a_i2c_address, const uint32_t a_shift_interval_ms);
+  explicit HT16K33_Display(I2C& aref_i2c, const uint8_t a_i2c_address, const uint32_t a_shift_interval_ms, const uint32_t a_string_timer_delay_interval_ms);
   ~HT16K33_Display();
   
   void TurnDisplayOn();
@@ -62,6 +62,7 @@ public:
   void PrintFloatNumber(float a_number); 
   void PrintString(const char* a_string);
   void SetBlink(const Blink a_blink);
+  void HardUpdate();
   void Update();
 private:
   enum Status : uint8_t
@@ -86,10 +87,9 @@ private:
   Blink           m_blink_frequency;
   const uint8_t   m_i2c_address;
   Program_timer&  m_update_timer;
-
+  Program_timer&  m_string_timer;
   const Digits    m_digits;
   const char*     m_string_buffer;
-  uint32_t        m_shift_delay;
   uint8_t         m_string_ptr_offset;
   uint8_t         m_string_length;
   uint16_t* const m_display_buffer;

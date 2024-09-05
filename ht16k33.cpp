@@ -21,15 +21,15 @@
 //                     ****
 
 
-HT16K33_Display::HT16K33_Display(I2C& aref_i2c, const uint8_t a_i2c_address, const uint32_t a_shift_interval_ms)
+HT16K33_Display::HT16K33_Display(I2C& aref_i2c, const uint8_t a_i2c_address, const uint32_t a_shift_interval_ms, const uint32_t a_string_timer_delay_interval_ms)
   : mref_i2c{aref_i2c}
   , m_brightness{Brightness::Brightness_16}
   , m_blink_frequency{Blink_Off}
   , m_i2c_address{static_cast<uint8_t>(a_i2c_address << 1)}
   , m_update_timer{* new Program_timer(Program_timer::TimerType_loop)}
+  , m_string_timer{* new Program_timer(Program_timer::TimerType_one_pulse)}
   , m_digits{Digits_4}
   , m_string_buffer{nullptr}
-  , m_shift_delay{0}
   , m_string_ptr_offset{0}  
   , m_string_length{0}
   , m_display_buffer{new uint16_t[m_digits]}
@@ -42,6 +42,7 @@ HT16K33_Display::HT16K33_Display(I2C& aref_i2c, const uint8_t a_i2c_address, con
   Clear();
   Update();
   m_update_timer.SetInterval_ms(a_shift_interval_ms);
+  m_string_timer.SetInterval_ms(a_string_timer_delay_interval_ms);
   m_update_timer.Start();
 }
 
@@ -49,6 +50,7 @@ HT16K33_Display::~HT16K33_Display()
 {
   delete[] m_display_buffer;
   delete  &m_update_timer;
+  delete  &m_string_timer;
 }
 
 void HT16K33_Display::TurnDisplayOn()
@@ -115,9 +117,8 @@ void HT16K33_Display::PrintNumber(uint32_t a_decimal_number, const Position a_se
   if(a_separator_position != Position_NONE)
     m_display_buffer[a_separator_position] |= separator_bitmask;
   
-  Update();
-  m_update_timer.Reload();
-  m_shift_delay = 0;
+  //Update();
+  //m_update_timer.Reload();
 }
 
 void HT16K33_Display::PrintFloatNumber(float a_number)
@@ -132,6 +133,9 @@ void HT16K33_Display::PrintFloatNumber(float a_number)
 
 void HT16K33_Display::PrintString(const char* a_string)
 {
+  if(m_status == Status_on_printing_string and a_string == m_string_buffer)
+    return;
+  
   m_status = Status_on_printing_string;
   m_string_buffer = a_string;
   m_string_ptr_offset = 0;
@@ -142,35 +146,51 @@ void HT16K33_Display::PrintString(const char* a_string)
     return;
   }  
   FillDisplaybufferWithString();
-  m_update_timer.Reload();
-  m_shift_delay = 0;
-  Update();
+  //m_update_timer.Reload();
+  //Update();
 }
 
 void HT16K33_Display::UpdateString()
 {
+  static bool is_delay_activated{false};
   if(m_string_length <= m_digits)
   {
     m_string_ptr_offset = 0;
     return;
   }
-  
-  auto shifts_remaining{m_string_length - m_string_ptr_offset-m_digits};
-  
-  if(m_string_ptr_offset == 0 or shifts_remaining == 0)
+  else
   {
-    if(m_shift_delay++ % 3 != 0)
+    auto shifts_remaining{m_string_length - m_string_ptr_offset - m_digits};
+    
+    if((m_string_ptr_offset == 0 or shifts_remaining == 0) and is_delay_activated == false)
+    {
+      is_delay_activated = true;
+      m_string_timer.Reload();
+      m_string_timer.Start();
+    }
+    
+    if(is_delay_activated and !m_string_timer.Check())
       return;
+    
+    else
+      is_delay_activated = false;
+    
+    m_string_ptr_offset = (shifts_remaining <= 0) ? 0 : m_string_ptr_offset+1;
+    FillDisplaybufferWithString();
   }
-  m_string_ptr_offset = (shifts_remaining <= 0) ? 0 : m_string_ptr_offset+1;
-  FillDisplaybufferWithString();
-  
 }
   
 void HT16K33_Display::SetBlink(const Blink a_blink)
 {
   m_blink_frequency = a_blink;
   TransmitCommand(a_blink);
+}
+
+
+void HT16K33_Display::HardUpdate()
+{
+  for(volatile auto i{0}; i < m_digits; ++i)
+    TransmitData(static_cast<Position>(i), m_display_buffer[i]);
 }
 
 void HT16K33_Display::Update()
@@ -421,12 +441,22 @@ void HT16K33_Display::FillDisplaybufferWithString()
   for (volatile auto i{0}; i < m_digits; ++i)
   {
     auto current_character_index{i+commas_number};
-    auto next_character_index{i+commas_number};
+    auto next_character_index{current_character_index+1};
     
     m_display_buffer[i] = CharacterToSymbol(m_string_buffer[m_string_ptr_offset+current_character_index]);
     constexpr auto comma_bitmask{0x4000};
     
-    if((m_string_buffer[next_character_index] == '.' or m_string_buffer[next_character_index] == ',')
+    
+//    if(i == 0 and (m_display_buffer[i] == ',' or m_display_buffer[i] == ','))
+//    {
+//      ++commas_number;
+//      current_character_index = i+commas_number;
+//      next_character_index = current_character_index + 1;
+//      m_display_buffer[i] = CharacterToSymbol(m_string_buffer[m_string_ptr_offset+current_character_index]);
+//    }
+    
+    
+    if((m_string_buffer[m_string_ptr_offset+next_character_index] == '.' or m_string_buffer[m_string_ptr_offset+next_character_index] == ',')
        and m_display_buffer[i] != comma_bitmask)
     {
       ++commas_number;
